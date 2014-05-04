@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cd ~/.local/share/lightndark
+./gui.py
+exit $?
+

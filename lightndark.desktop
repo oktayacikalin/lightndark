@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Light'N'Dark
+GenericName=Display adjustment
+Comment=Monitors your ambient light sensor and adapts your display and keyboard accordingly.
+Exec=lightndark-gui
+Icon=lightndark
+Terminal=false
+Type=Application
+Categories=Utility
+StartupNotify=true

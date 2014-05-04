@@ -1,0 +1,1 @@
+ACTION=="change", KERNEL=="ACPI0008:00", RUN+="/home/oktay/Projekte/lightndark/lightndark/update.py /home/oktay/Projekte/lightndark/lightndark/config.ini"
