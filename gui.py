@@ -164,7 +164,7 @@ class Application(Gtk.Application):
         return repeat
 
     def tray_icon_activated(self, widget, data=None):
-        self.manage_dsp_backlight = True
+        self.manage_dsp_backlight = False
         self.last_display_backlight_percent = None
         self.update_all()
 
