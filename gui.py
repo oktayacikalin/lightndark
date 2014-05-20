@@ -6,7 +6,7 @@
 # @copyright Oktay Acikalin
 # @license   MIT (LICENSE.txt)
 
-from gi.repository import Gtk, Gio, GObject
+from gi.repository import Gtk, Gio, GLib
 import sys
 import configparser
 from os.path import join, dirname
@@ -91,15 +91,20 @@ class Application(Gtk.Application):
                    lambda w, x: icon.position_menu(menu, icon),
                    icon, 3, time)
 
-    def update_all(self, repeat=True):
-        # TODO detect if display is absent or again present. When display is available again, management has to be reenabled.
+    def update_all(self):
+        # log('update_all')
+
+        # TODO detect if display is absent or again present. When display is
+        #      available again, management has to be reenabled.
         display_backlight_percent = get_display_backlight_value()
         if self.manage_dsp_backlight:
             if self.last_display_backlight_percent != display_backlight_percent:
                 log('Halting management of display backlight.')
                 self.manage_dsp_backlight = False
         else:
-            if self.last_display_backlight_percent is None or (self.last_display_backlight_percent > display_backlight_percent - 10 and self.last_display_backlight_percent < display_backlight_percent + 10):
+            if self.last_display_backlight_percent is None or (
+                    self.last_display_backlight_percent > display_backlight_percent - 10 and
+                    self.last_display_backlight_percent < display_backlight_percent + 10):
                 log('Resuming management of display backlight.')
                 self.manage_dsp_backlight = True
                 self.last_display_backlight_percent = None
@@ -108,6 +113,7 @@ class Application(Gtk.Application):
         if self.manage_dsp_backlight:
             # Modify brightness of display.
             sensor_value, sensor_value_percent = get_sensor_value(config)
+            # log('Sensor value = %s; in percent = %s' % (sensor_value, sensor_value_percent))
             display_backlight_percent = calc_shifted_backlight_percent(config, sensor_value_percent)
             if self.last_display_backlight_percent != display_backlight_percent:
                 # diff = display_backlight_percent - self.last_display_backlight_percent
@@ -120,7 +126,7 @@ class Application(Gtk.Application):
                 log('Ambient light sensor value: %d (%d%%)' % (sensor_value, sensor_value_percent))
                 log('Calculated display backlight: %d%%' % display_backlight_percent)
                 modify_display_backlight_value(display_backlight_percent)
-                # GObject.timeout_add(50, lambda: self.update_all(repeat=False))
+                # GLib.timeout_add(50, self.update_all)
         # else:
         #     if self.last_display_backlight_percent != display_backlight_percent:
         #         # self.last_display_backlight_percent = display_backlight_percent
@@ -160,8 +166,14 @@ class Application(Gtk.Application):
                 time.sleep(0.1)
                 modify_keyboard_backlight_value(keyboard_backlight_percent)
 
-        # Makes gobject.timeout_add* repeatedly call this method.
-        return repeat
+    def update_all_tick(self):
+        # log('update_tick')
+        try:
+            self.update_all()
+        except Exception as exception:
+            log(exception)
+        # Makes GLib.timeout_add* repeatedly call this method.
+        return True
 
     def tray_icon_activated(self, widget, data=None):
         self.manage_dsp_backlight = False
@@ -180,7 +192,7 @@ class Application(Gtk.Application):
         icon.set_visible(True)
         self.tray_icon = icon
 
-        GObject.timeout_add_seconds(1, self.update_all)
+        GLib.timeout_add_seconds(1, self.update_all_tick)
 
     def on_deactivate(self):
         self.tray_icon.set_visible(False)
