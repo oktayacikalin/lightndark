@@ -19,4 +19,6 @@ install:
 	cp -a lightndark.svg $(PREFIX)/share/icons/
 	cp -a lightndark.desktop $(PREFIX)/share/applications/
 
-all: install
+all:
+	@echo "Usage: $0 [install|uninstall]"
+
