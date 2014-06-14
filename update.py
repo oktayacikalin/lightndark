@@ -17,6 +17,31 @@ from math import floor, ceil, cos, pi
 TEMPERATURE_TABLE_FILEPATH = join(dirname(__file__), 'thirdparty', 'bbr_color.txt')
 
 
+def get_interface():
+    # You must initialize the gobject/dbus support for threading
+    # before doing anything.
+    from gi.repository import GObject
+    GObject.threads_init()
+
+    from dbus import glib
+    glib.init_threads()
+
+    # Create a session bus.
+    import dbus
+    bus = dbus.SessionBus()
+
+    # Create an object that will proxy for a particular remote object.
+    remote_object = bus.get_object(
+        'org.gnome.SettingsDaemon',
+        '/org/gnome/SettingsDaemon/Power'
+    )
+
+    # Get a particular interface
+    iface = dbus.Interface(remote_object, 'org.freedesktop.DBus.Properties')
+
+    return iface
+
+
 def cosine_interpolate(y1, y2, mul):
     mul2 = (1 - cos(mul * pi)) / 2
     return y1 * (1 - mul2) + y2 * mul2
@@ -44,11 +69,8 @@ def get_display_temperature_table(config):
     return table
 
 
-def get_display_backlight_value():
-    return int(subprocess.getoutput('''
-        qdbus org.gnome.SettingsDaemon.Power /org/gnome/SettingsDaemon/Power
-        org.gnome.SettingsDaemon.Power.Screen.Brightness
-    '''.replace('\n', '')))
+def get_display_backlight_value(iface):
+    return iface.Get('org.gnome.SettingsDaemon.Power.Screen', 'Brightness')
 
 
 def calc_shifted_backlight_percent(config, percent):
@@ -100,33 +122,23 @@ def calc_keyboard_backlight_percent(display_backlight_percent):
     return int(min(100, max(0, 100 - display_backlight_percent)))
 
 
-def modify_display_backlight_value(display_backlight_percent):
-    # subprocess.call(['xbacklight', '-d', ':0', '-set',
-    #                 str(display_backlight_percent)])
-    status, output = subprocess.getstatusoutput('''
-        dbus-send --print-reply --dest=:1.10 /org/gnome/SettingsDaemon/Power org.freedesktop.DBus.Properties.Set
-        string:"org.gnome.SettingsDaemon.Power.Screen" string:"Brightness" variant:int32:%d
-    '''.replace('\n', '') % display_backlight_percent)
-    if status != 0 or 'error' in output.lower():
-        raise Exception('[%d] %s' % (status, output))
+def modify_display_backlight_value(iface, display_backlight_percent):
+    iface.Set('org.gnome.SettingsDaemon.Power.Screen', 'Brightness', display_backlight_percent)
 
 
 def modify_display_gamma_value(gamma):
     subprocess.call(['xrandr', '--output', 'LVDS1', '--gamma', gamma])
 
 
-def modify_keyboard_backlight_value(percent):
-    status, output = subprocess.getstatusoutput('''
-        dbus-send --print-reply --dest=:1.10 /org/gnome/SettingsDaemon/Power org.freedesktop.DBus.Properties.Set
-        string:"org.gnome.SettingsDaemon.Power.Keyboard" string:"Brightness" variant:int32:%d
-    '''.replace('\n', '') % percent)
-    if status != 0 or 'error' in output.lower():
-        raise Exception('[%d] %s' % (status, output))
+def modify_keyboard_backlight_value(iface, percent):
+    iface.Set('org.gnome.SettingsDaemon.Power.Keyboard', 'Brightness', percent)
 
 
 def main():
     config = configparser.ConfigParser()
     config.readfp(open(sys.argv[1]))
+
+    iface = get_interface()
 
     if '--display-brightness' in sys.argv or '-b' in sys.argv:
         # Modify brightness of display.
@@ -134,9 +146,9 @@ def main():
         display_backlight_percent = calc_shifted_backlight_percent(config, sensor_value_percent)
         print('Ambient light sensor value: %d (%d%%)' % (sensor_value, sensor_value_percent))
         print('Calculated display backlight: %d%%' % display_backlight_percent)
-        modify_display_backlight_value(display_backlight_percent)
+        modify_display_backlight_value(iface, display_backlight_percent)
     else:
-        display_backlight_percent = get_display_backlight_value()
+        display_backlight_percent = get_display_backlight_value(iface)
         print('Current display backlight: %d%%' % display_backlight_percent)
 
     if '--display-temperature' in sys.argv or '-t' in sys.argv:
@@ -159,10 +171,10 @@ def main():
         keyboard_backlight_percent = calc_keyboard_backlight_percent(display_backlight_percent)
         print('Calculated keyboard backlight: %d%%' % keyboard_backlight_percent)
         # First initiate a workaround for lazy keyboard backlight logic.
-        modify_keyboard_backlight_value(50)
-        modify_keyboard_backlight_value(0)
+        modify_keyboard_backlight_value(iface, 50)
+        modify_keyboard_backlight_value(iface, 0)
         # Now set correct value.
-        modify_keyboard_backlight_value(keyboard_backlight_percent)
+        modify_keyboard_backlight_value(iface, keyboard_backlight_percent)
 
 
 if __name__ == '__main__':
