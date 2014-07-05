@@ -1,6 +1,6 @@
 ROOT := $(shell pwd)
-PREFIX := $(shell realpath ~/.local)
-OBJECTS := config.ini gui.py update.py
+PREFIX := $(shell readlink -f ~/.local)
+OBJECTS := config.ini gui-appindicator.py gui-systray.py update.py
 
 uninstall:
 	rm -r $(PREFIX)/share/lightndark
