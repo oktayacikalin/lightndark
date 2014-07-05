@@ -17,7 +17,7 @@ from math import floor, ceil, cos, pi
 TEMPERATURE_TABLE_FILEPATH = join(dirname(__file__), 'thirdparty', 'bbr_color.txt')
 
 
-def get_interface():
+def get_interfaces():
     # You must initialize the gobject/dbus support for threading
     # before doing anything.
     from gi.repository import GObject
@@ -36,10 +36,10 @@ def get_interface():
         '/org/gnome/SettingsDaemon/Power'
     )
 
-    # Get a particular interface
-    iface = dbus.Interface(remote_object, 'org.freedesktop.DBus.Properties')
-
-    return iface
+    return (
+        dbus.Interface(remote_object, 'org.gnome.SettingsDaemon.Power.Screen'),
+        dbus.Interface(remote_object, 'org.gnome.SettingsDaemon.Power.Keyboard')
+    )
 
 
 def cosine_interpolate(y1, y2, mul):
@@ -70,7 +70,7 @@ def get_display_temperature_table(config):
 
 
 def get_display_backlight_value(iface):
-    return iface.Get('org.gnome.SettingsDaemon.Power.Screen', 'Brightness')
+    return iface.GetPercentage()
 
 
 def calc_shifted_backlight_percent(config, percent):
@@ -123,7 +123,7 @@ def calc_keyboard_backlight_percent(display_backlight_percent):
 
 
 def modify_display_backlight_value(iface, display_backlight_percent):
-    iface.Set('org.gnome.SettingsDaemon.Power.Screen', 'Brightness', display_backlight_percent)
+    iface.SetPercentage(display_backlight_percent)
 
 
 def modify_display_gamma_value(gamma):
@@ -131,14 +131,14 @@ def modify_display_gamma_value(gamma):
 
 
 def modify_keyboard_backlight_value(iface, percent):
-    iface.Set('org.gnome.SettingsDaemon.Power.Keyboard', 'Brightness', percent)
+    iface.SetPercentage(percent)
 
 
 def main():
     config = configparser.ConfigParser()
     config.readfp(open(sys.argv[1]))
 
-    iface = get_interface()
+    display_iface, keyboard_iface = get_interfaces()
 
     if '--display-brightness' in sys.argv or '-b' in sys.argv:
         # Modify brightness of display.
@@ -146,9 +146,9 @@ def main():
         display_backlight_percent = calc_shifted_backlight_percent(config, sensor_value_percent)
         print('Ambient light sensor value: %d (%d%%)' % (sensor_value, sensor_value_percent))
         print('Calculated display backlight: %d%%' % display_backlight_percent)
-        modify_display_backlight_value(iface, display_backlight_percent)
+        modify_display_backlight_value(display_iface, display_backlight_percent)
     else:
-        display_backlight_percent = get_display_backlight_value(iface)
+        display_backlight_percent = get_display_backlight_value(display_iface)
         print('Current display backlight: %d%%' % display_backlight_percent)
 
     if '--display-temperature' in sys.argv or '-t' in sys.argv:
@@ -171,10 +171,10 @@ def main():
         keyboard_backlight_percent = calc_keyboard_backlight_percent(display_backlight_percent)
         print('Calculated keyboard backlight: %d%%' % keyboard_backlight_percent)
         # First initiate a workaround for lazy keyboard backlight logic.
-        modify_keyboard_backlight_value(iface, 50)
-        modify_keyboard_backlight_value(iface, 0)
+        modify_keyboard_backlight_value(keyboard_iface, 50)
+        modify_keyboard_backlight_value(keyboard_iface, 0)
         # Now set correct value.
-        modify_keyboard_backlight_value(iface, keyboard_backlight_percent)
+        modify_keyboard_backlight_value(keyboard_iface, keyboard_backlight_percent)
 
 
 if __name__ == '__main__':

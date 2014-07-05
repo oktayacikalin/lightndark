@@ -15,7 +15,7 @@ import logging
 
 
 from update import (
-    get_interface,
+    get_interfaces,
     get_sensor_value,
     get_display_backlight_value,
     calc_shifted_backlight_percent,
@@ -56,13 +56,13 @@ class Application(Gtk.Application):
         config_filepath = join(dirname(__file__), 'config.ini')
         config = configparser.ConfigParser()
         config.readfp(open(config_filepath))
-        self.iface = get_interface()
+        self.dsp_iface, self.kbd_iface = get_interfaces()
         self.config = config
         self.manage_dsp_backlight = True
         self.manage_dsp_temperature = True
         self.manage_dsp_gamma = True
         self.manage_kbd_backlight = True
-        self.last_display_backlight_percent = get_display_backlight_value(self.iface)
+        self.last_display_backlight_percent = get_display_backlight_value(self.dsp_iface)
         self.last_display_temperature = None
         self.last_display_gamma_value = None
         self.last_keyboard_backlight_percent = None
@@ -98,7 +98,7 @@ class Application(Gtk.Application):
 
         # TODO detect if display is absent or again present. When display is
         #      available again, management has to be reenabled.
-        display_backlight_percent = get_display_backlight_value(self.iface)
+        display_backlight_percent = get_display_backlight_value(self.dsp_iface)
         if self.manage_dsp_backlight:
             if self.last_display_backlight_percent != display_backlight_percent:
                 log('Halting management of display backlight.')
@@ -127,7 +127,7 @@ class Application(Gtk.Application):
                 self.last_display_backlight_percent = display_backlight_percent
                 log('Ambient light sensor value: %d (%d%%)' % (sensor_value, sensor_value_percent))
                 log('Calculated display backlight: %d%%' % display_backlight_percent)
-                modify_display_backlight_value(self.iface, display_backlight_percent)
+                modify_display_backlight_value(self.dsp_iface, display_backlight_percent)
                 # GLib.timeout_add(50, self.update_all)
         # else:
         #     if self.last_display_backlight_percent != display_backlight_percent:
@@ -162,11 +162,11 @@ class Application(Gtk.Application):
                 # Modify brightness of keyboard.
                 log('Calculated keyboard backlight: %d%%' % keyboard_backlight_percent)
                 import time
-                modify_keyboard_backlight_value(self.iface, 0)
+                modify_keyboard_backlight_value(self.kbd_iface, 0)
                 time.sleep(0.1)
-                modify_keyboard_backlight_value(self.iface, 100)
+                modify_keyboard_backlight_value(self.kbd_iface, 100)
                 time.sleep(0.1)
-                modify_keyboard_backlight_value(self.iface, keyboard_backlight_percent)
+                modify_keyboard_backlight_value(self.kbd_iface, keyboard_backlight_percent)
 
     def update_all_tick(self):
         # log('update_tick')
