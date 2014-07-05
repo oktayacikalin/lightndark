@@ -70,17 +70,17 @@ class Application(Gtk.Application):
     def show_main_window(self, widget, data=None):
         self.window.show_all()
 
-    def tray_icon_quit(self, widget, data=None):
+    def icon_quit(self, widget, data=None):
         self.quit()
 
-    def tray_icon_menu(self, widget, button, time, data=None):
+    def icon_menu(self, widget, button, time, data=None):
         menu = Gtk.Menu()
 
         menu_item_show_main_window = Gtk.MenuItem('Settings')
         menu_item_quit = Gtk.MenuItem('Quit')
 
         menu_item_show_main_window.connect('activate', self.show_main_window)
-        menu_item_quit.connect('activate', self.tray_icon_quit)
+        menu_item_quit.connect('activate', self.icon_quit)
 
         menu.append(menu_item_show_main_window)
         menu.append(menu_item_quit)
@@ -88,7 +88,7 @@ class Application(Gtk.Application):
         menu.show_all()
         self.menu = menu
 
-        icon = self.tray_icon
+        icon = self.icon
         menu.popup(None, None,
                    lambda w, x: icon.position_menu(menu, icon),
                    icon, 3, time)
@@ -177,7 +177,7 @@ class Application(Gtk.Application):
         # Makes GLib.timeout_add* repeatedly call this method.
         return True
 
-    def tray_icon_activated(self, widget, data=None):
+    def icon_activated(self, widget, data=None):
         self.manage_dsp_backlight = False
         self.last_display_backlight_percent = None
         self.update_all()
@@ -189,16 +189,16 @@ class Application(Gtk.Application):
 
         icon = Gtk.StatusIcon()
         icon.set_from_stock(Gtk.STOCK_ABOUT)
-        icon.connect('activate', self.tray_icon_activated)
-        icon.connect('popup_menu', self.tray_icon_menu)
+        icon.connect('activate', self.icon_activated)
+        icon.connect('popup_menu', self.icon_menu)
         icon.set_visible(True)
-        self.tray_icon = icon
+        self.icon = icon
 
         GLib.timeout_add_seconds(1, self.update_all_tick)
 
     def on_deactivate(self):
-        self.tray_icon.set_visible(False)
-        del self.tray_icon
+        self.icon.set_visible(False)
+        del self.icon
 
 
 if __name__ == "__main__":
