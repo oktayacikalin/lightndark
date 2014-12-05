@@ -58,10 +58,12 @@ class Application(Gtk.Application):
         config.readfp(open(config_filepath))
         self.dsp_iface, self.kbd_iface = get_interfaces()
         self.config = config
+        self.menu_items = dict()
         self.manage_dsp_backlight = True
         self.manage_dsp_temperature = True
         self.manage_dsp_gamma = True
-        self.manage_kbd_backlight = True
+        self.manage_kbd_backlight = False
+        # self.last_sensor_value_percent = None
         self.last_display_backlight_percent = get_display_backlight_value(self.dsp_iface)
         self.last_display_temperature = None
         self.last_display_gamma_value = None
@@ -76,38 +78,46 @@ class Application(Gtk.Application):
     def icon_menu(self, widget, button, time, data=None):
         menu = Gtk.Menu()
 
-        menu_item_force = Gtk.MenuItem('Force')
+        menu_item_mng_dsp_backlight = Gtk.CheckMenuItem('Manage display backlight')
+        menu_item_mng_dsp_temperature = Gtk.CheckMenuItem('Manage display temperature')
+        menu_item_mng_dsp_gamma = Gtk.CheckMenuItem('Manage display gamma')
+        menu_item_mng_kbd_backlight = Gtk.CheckMenuItem('Manage keyboard backlight')
         # menu_item_show_main_window = Gtk.MenuItem('Settings')
         menu_item_quit = Gtk.MenuItem('Quit')
 
-        menu_item_force.connect('activate', self.icon_activated)
+        menu_item_mng_dsp_backlight.set_active(self.manage_dsp_backlight)
+        menu_item_mng_dsp_temperature.set_active(self.manage_dsp_temperature)
+        menu_item_mng_dsp_gamma.set_active(self.manage_dsp_gamma)
+        menu_item_mng_kbd_backlight.set_active(self.manage_kbd_backlight)
+
+        menu_item_mng_dsp_backlight.connect('toggled', self.on_toggle_mng_dsp_backlight)
+        menu_item_mng_dsp_temperature.connect('toggled', self.on_toggle_mng_dsp_temperature)
+        menu_item_mng_dsp_gamma.connect('toggled', self.on_toggle_mng_dsp_gamma)
+        menu_item_mng_kbd_backlight.connect('toggled', self.on_toggle_mng_kbd_backlight)
         # menu_item_show_main_window.connect('activate', self.show_main_window)
         menu_item_quit.connect('activate', self.icon_quit)
 
-        menu.append(menu_item_force)
+        menu.append(menu_item_mng_dsp_backlight)
+        menu.append(menu_item_mng_dsp_temperature)
+        menu.append(menu_item_mng_dsp_gamma)
+        menu.append(menu_item_mng_kbd_backlight)
+        menu.append(Gtk.SeparatorMenuItem())
         # menu.append(menu_item_show_main_window)
         menu.append(menu_item_quit)
 
         menu.show_all()
         self.menu = menu
+        self.menu_items = dict(
+            mng_dsp_backlight=menu_item_mng_dsp_backlight,
+            mng_dsp_temperature=menu_item_mng_dsp_temperature,
+            mng_dsp_gamma=menu_item_mng_dsp_gamma,
+            mng_kbd_backlight=menu_item_mng_kbd_backlight,
+        )
 
     def update_all(self):
         # log('update_all')
 
-        # TODO detect if display is absent or again present. When display is
-        #      available again, management has to be reenabled.
         display_backlight_percent = get_display_backlight_value(self.dsp_iface)
-        if self.manage_dsp_backlight:
-            if self.last_display_backlight_percent != display_backlight_percent:
-                log('Halting management of display backlight.')
-                self.manage_dsp_backlight = False
-        else:
-            if self.last_display_backlight_percent is None or (
-                    self.last_display_backlight_percent > display_backlight_percent - 10 and
-                    self.last_display_backlight_percent < display_backlight_percent + 10):
-                log('Resuming management of display backlight.')
-                self.manage_dsp_backlight = True
-                self.last_display_backlight_percent = None
 
         config = self.config
         if self.manage_dsp_backlight:
@@ -116,6 +126,9 @@ class Application(Gtk.Application):
             # log('Sensor value = %s; in percent = %s' % (sensor_value, sensor_value_percent))
             display_backlight_percent = calc_shifted_backlight_percent(config, sensor_value_percent)
             if self.last_display_backlight_percent != display_backlight_percent:
+                # log((self.last_sensor_value_percent, sensor_value_percent))
+                # self.last_sensor_value_percent = sensor_value_percent
+                # log((display_backlight_percent, self.last_display_backlight_percent))
                 # diff = display_backlight_percent - self.last_display_backlight_percent
                 # diff *= 0.1
                 # diff = int(diff * 100) / 100
@@ -168,17 +181,52 @@ class Application(Gtk.Application):
 
     def update_all_tick(self):
         # log('update_tick')
+        config = self.config
         try:
+            display_backlight_percent = get_display_backlight_value(self.dsp_iface)
+            # print((self.manage_dsp_backlight, self.last_display_backlight_percent, display_backlight_percent))
+            brightness_differs = self.last_display_backlight_percent != display_backlight_percent
+            if brightness_differs:
+                brightness_within_range = (
+                    self.last_display_backlight_percent is None or
+                    (self.last_display_backlight_percent > display_backlight_percent - 10 and
+                     self.last_display_backlight_percent < display_backlight_percent + 10)
+                )
+                if brightness_within_range:
+                    if not self.manage_dsp_backlight:
+                        self.menu_items['mng_dsp_backlight'].set_active(True)
+                elif self.manage_dsp_backlight:
+                    # log((display_backlight_percent, self.last_display_backlight_percent))
+                    self.menu_items['mng_dsp_backlight'].set_active(False)
+            elif not self.manage_dsp_backlight:
+                # self.menu_items['mng_dsp_backlight'].set_active(True)
+                self.last_display_backlight_percent = display_backlight_percent
             self.update_all()
         except Exception as exception:
             log(exception)
+            # raise
         # Makes GLib.timeout_add* repeatedly call this method.
         return True
 
-    def icon_activated(self, widget, data=None):
-        self.manage_dsp_backlight = False
-        self.last_display_backlight_percent = None
-        self.update_all()
+    def on_toggle_mng_dsp_backlight(self, widget, data=None):
+        has_changed = widget.get_active() != self.manage_dsp_backlight
+        self.manage_dsp_backlight = widget.get_active()
+        if has_changed:
+            if self.manage_dsp_backlight:
+                log('Resuming management of display backlight.')
+                self.last_display_backlight_percent = None
+                # self.update_all()
+            else:
+                log('Halting management of display backlight.')
+
+    def on_toggle_mng_dsp_temperature(self, widget, data=None):
+        self.manage_dsp_temperature = widget.get_active()
+
+    def on_toggle_mng_dsp_gamma(self, widget, data=None):
+        self.manage_dsp_gamma = widget.get_active()
+
+    def on_toggle_mng_kbd_backlight(self, widget, data=None):
+        self.manage_kbd_backlight = widget.get_active()
 
     def on_activate(self, data=None):
         window = Window(application=self)
