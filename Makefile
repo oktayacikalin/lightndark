@@ -18,6 +18,7 @@ install:
 	cp -a lightndark-gui $(PREFIX)/bin/
 	cp -a lightndark.svg $(PREFIX)/share/icons/
 	cp -a lightndark.desktop $(PREFIX)/share/applications/
+	sed -i 's!lightndark-gui!$(PREFIX)/bin/lightndark-gui!' $(PREFIX)/share/applications/lightndark.desktop
 
 all:
 	@echo "Usage: $0 [install|uninstall]"
