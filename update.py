@@ -52,7 +52,7 @@ def get_sensor_value(config):
     value = int(open(sensor_acpi_device).read())
     min_value = config.getint('sensor', 'min')
     max_value = config.getint('sensor', 'max')
-    percent = 100.0 / max_value * max(min_value, value)
+    percent = 100.00 / max_value * max(min_value, value)
     percent = min(100, max(0, percent))
     return value, percent
 
